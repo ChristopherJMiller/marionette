@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "marionette": {
+      "command": "./target/debug/marionette",
+      "args": []
+    }
+  }
+}
