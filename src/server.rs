@@ -142,8 +142,8 @@ pub struct MarionetteServer {
 #[tool_router]
 impl MarionetteServer {
     /// Create a new Marionette server
-    pub fn new() -> anyhow::Result<Self> {
-        let backend = crate::backend::create_backend()?;
+    pub async fn new() -> anyhow::Result<Self> {
+        let backend = crate::backend::create_backend().await?;
 
         Ok(Self {
             registry: Arc::new(RwLock::new(WindowRegistry::new())),

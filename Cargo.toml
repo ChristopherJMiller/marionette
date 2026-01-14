@@ -17,6 +17,9 @@ async-trait = "0.1"
 # X11
 x11rb = { version = "0.13", features = ["all-extensions"] }
 
+# D-Bus (for KWin/Wayland)
+zbus = "5"
+
 # Screenshots
 xcap = "0.8"
 image = "0.25"

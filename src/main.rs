@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Starting Marionette MCP Server");
 
     // Create the server
-    let server = MarionetteServer::new()?;
+    let server = MarionetteServer::new().await?;
 
     // Run with stdio transport
     let transport = stdio();

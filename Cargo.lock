@@ -1462,6 +1462,7 @@ dependencies = [
  "tracing-subscriber",
  "x11rb",
  "xcap",
+ "zbus",
 ]
 
 [[package]]

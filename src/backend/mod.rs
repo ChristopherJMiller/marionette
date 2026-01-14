@@ -3,6 +3,7 @@
 //! This module provides a platform-agnostic interface for window operations,
 //! with implementations for X11 and Wayland.
 
+mod kwin;
 mod x11;
 
 use async_trait::async_trait;
@@ -37,18 +38,55 @@ pub trait WindowBackend: Send + Sync {
     async fn resize_window(&self, id: &PlatformWindowId, width: u32, height: u32) -> anyhow::Result<()>;
 }
 
+/// Detect if running on KDE Plasma
+fn is_kde_plasma() -> bool {
+    // Check for KDE-specific environment variables
+    std::env::var("KDE_FULL_SESSION").is_ok()
+        || std::env::var("KDE_SESSION_VERSION").is_ok()
+        || std::env::var("XDG_CURRENT_DESKTOP")
+            .map(|d| d.to_uppercase().contains("KDE"))
+            .unwrap_or(false)
+}
+
+/// Detect if running on Wayland
+fn is_wayland() -> bool {
+    std::env::var("WAYLAND_DISPLAY").is_ok()
+        || std::env::var("XDG_SESSION_TYPE")
+            .map(|t| t.to_lowercase() == "wayland")
+            .unwrap_or(false)
+}
+
 /// Create the appropriate backend for the current environment
-pub fn create_backend() -> anyhow::Result<Arc<dyn WindowBackend>> {
-    // For now, we always use X11 backend
-    // On Wayland with XWayland, this still works for XWayland windows (games)
-    // Future: Add detection and Wayland backend for wlroots compositors
-
+pub async fn create_backend() -> anyhow::Result<Arc<dyn WindowBackend>> {
     let display_env = std::env::var("DISPLAY").ok();
+    let wayland = is_wayland();
+    let kde = is_kde_plasma();
 
-    if let Some(ref disp) = display_env {
-        tracing::info!("Using X11 backend (DISPLAY={})", disp);
-        Ok(Arc::new(x11::X11Backend::new()?))
-    } else {
+    // Always need X11/XWayland for window enumeration
+    if display_env.is_none() {
         anyhow::bail!("No display server detected. Set DISPLAY for X11 or XWayland.")
     }
+
+    let x11_backend: Arc<dyn WindowBackend> = Arc::new(x11::X11Backend::new()?);
+
+    // On KDE Wayland, use KWin backend for proper window focus
+    if wayland && kde {
+        tracing::info!(
+            "Using KWin backend (WAYLAND_DISPLAY={}, KDE detected)",
+            std::env::var("WAYLAND_DISPLAY").unwrap_or_default()
+        );
+        match kwin::KWinBackend::new(x11_backend.clone()).await {
+            Ok(kwin_backend) => return Ok(Arc::new(kwin_backend)),
+            Err(e) => {
+                tracing::warn!("Failed to initialize KWin backend, falling back to X11: {}", e);
+            }
+        }
+    }
+
+    // Default to pure X11 backend
+    tracing::info!(
+        "Using X11 backend (DISPLAY={})",
+        display_env.unwrap_or_default()
+    );
+    Ok(x11_backend)
 }
